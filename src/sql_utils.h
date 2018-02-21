@@ -9,7 +9,7 @@
 
 // Unique ownership SQLite3 statement creation
 template <typename T>
-static void bindArguments(sqlite3* db, sqlite3_stmt* statement, int cnt, int v) {
+static void bindArgument(sqlite3* db, sqlite3_stmt* statement, int cnt, int v) {
   if (sqlite3_bind_int(statement, cnt, v) != SQLITE_OK) {
     LOG_ERROR << "Could not bind: " << sqlite3_errmsg(db);
     throw std::runtime_error("SQLite bind error");
