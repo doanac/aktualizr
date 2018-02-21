@@ -124,14 +124,17 @@ class Target {
   };
 
   bool operator==(const Target &t2) const {
-    if (filename_ == t2.filename_ && length_ == t2.length_) {
-      for (std::vector<Hash>::const_iterator it = hashes_.begin(); it != hashes_.end(); ++it) {
-        if (t2.MatchWith(*it)) {
-          return true;
-        }
+    if (type_ != t2.type_) return false;
+    if (filename_ != t2.filename_) return false;
+    if (length_ != t2.length_) return false;
+    if (hashes_.size() != t2.hashes_.size()) return false;
+
+    for (const Hash &hash : hashes_) {
+      if (!t2.MatchWith(hash)) {
+        return false;
       }
     }
-    return false;
+    return true;
   }
 
   friend std::ostream &operator<<(std::ostream &os, const Target &t);
