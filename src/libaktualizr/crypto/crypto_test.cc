@@ -58,6 +58,7 @@ TEST(crypto, findPkcsLibrary) {
 
 /* Sign and verify a file with RSA via PKCS#11. */
 TEST(crypto, sign_verify_rsa_p11) {
+  std::cout << "HERE you are andy\n";
   P11Config config;
   config.module = TEST_PKCS11_MODULE_PATH;
   config.pass = "1234";

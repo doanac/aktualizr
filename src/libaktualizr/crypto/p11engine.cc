@@ -248,15 +248,19 @@ bool P11Engine::generateUptaneKeyPair() {
 bool P11Engine::readTlsCert(std::string* cert_out) const {
   const std::string& id = config_.tls_clientcert_id;
 
+  LOG_DEBUG << "ANDY in readTlsCert";
   if (config_.module.empty()) {
+    LOG_WARNING << "ANDY config._module is empty";
     return false;
   }
   if ((id.length() % 2) != 0u) {
+    LOG_WARNING << "ANDY id length wrong " << id;
     return false;  // id is a hex string
   }
 
   PKCS11_SLOT* slot = findTokenSlot();
   if (slot == nullptr) {
+    LOG_WARNING << "ANDY can't find a a slot";
     return false;
   }
 
@@ -273,7 +277,9 @@ bool P11Engine::readTlsCert(std::string* cert_out) const {
     std::vector<unsigned char> id_hex;
     boost::algorithm::unhex(id, std::back_inserter(id_hex));
 
+    LOG_INFO << "ANDY FOUND " << ncerts << certs;
     for (unsigned int i = 0; i < ncerts; i++) {
+      LOG_DEBUG << "ANDY CERT " << i << certs[i].id_len << " data " << certs[i].id[0] << certs[i].id[1] ;
       // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
       if ((certs[i].id_len == id.length() / 2) && (memcmp(certs[i].id, id_hex.data(), id.length() / 2) == 0)) {
         // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)

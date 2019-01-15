@@ -168,6 +168,7 @@ std::string KeyManager::getCN() const {
     if (!built_with_p11) {
       throw std::runtime_error("Aktualizr was built without PKCS#11 support, can't extract device_id");
     }
+    LOG_DEBUG << "ANDY hitting p11 code from getCN()";
     if (!(*p11_)->readTlsCert(&cert)) {
       throw std::runtime_error(not_found_cert_message);
     }
