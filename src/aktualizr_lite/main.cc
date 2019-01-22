@@ -10,6 +10,36 @@
 
 namespace bpo = boost::program_options;
 
+static int initialize_main(Config &config, bpo::variables_map) {
+  if (config.provision.primary_ecu_hardware_id.length() == 0) {
+    LOG_INFO << "Probing TUF targets to find the primary ECU's hardware-id";
+    auto storage = INvStorage::newStorage(config.storage);
+    auto client = SotaUptaneClient::newDefaultClient(config, storage);
+
+    GObjectUniquePtr<OstreeSysroot> sysroot_smart = OstreeManager::LoadSysroot(config.pacman.sysroot);
+    OstreeDeployment *deployment = ostree_sysroot_get_booted_deployment(sysroot_smart.get());
+    auto active = ostree_deployment_get_csum(deployment);
+
+    auto targets = client->GetRepoTargets();
+    for (auto i = targets.rbegin(); i != targets.rend(); ++i) {
+      if ((*i).sha256Hash() == active) {
+        config.provision.primary_ecu_hardware_id = (*i).hardwareIds().front().ToString();
+        LOG_INFO << "Probed primary ECU hardware-id: " << config.provision.primary_ecu_hardware_id;
+        break;
+      }
+    }
+    if (config.provision.primary_ecu_hardware_id.length() == 0) {
+      throw std::runtime_error("Unable to find current active image in targets.json");
+    }
+  }
+  boost::filesystem::path p = config.storage.path / "lite.toml";
+  std::ofstream os(p.c_str(), std::ofstream::out);
+  config.writeToStream(os);
+  os.close();
+  LOG_INFO << "Configuration written to: " << p;
+  return 0;
+}
+
 static int status_main(Config &config, bpo::variables_map) {
   GObjectUniquePtr<OstreeSysroot> sysroot_smart = OstreeManager::LoadSysroot(config.pacman.sysroot);
   OstreeDeployment *deployment = ostree_sysroot_get_booted_deployment(sysroot_smart.get());
@@ -76,6 +106,7 @@ struct SubCommand {
   int (*main)(Config&, bpo::variables_map);
 };
 static SubCommand commands[] = {
+  {"initialize", initialize_main},
   {"status", status_main},
   {"list", list_main},
   {"update", update_main},
