@@ -21,12 +21,30 @@ static int status_main(Config &config, bpo::variables_map) {
   return 0;
 }
 
+static int list_main(Config &config, bpo::variables_map) {
+  auto storage = INvStorage::newStorage(config.storage);
+  auto client = SotaUptaneClient::newDefaultClient(config, storage);
+  Uptane::HardwareIdentifier hwid(config.provision.primary_ecu_hardware_id);
+
+  LOG_INFO << "Updates for available to " << hwid << ":";
+  for (auto& t : client->allTargets()) {
+    for (auto const& it : t.hardwareIds()) {
+      if (it == hwid) {
+        LOG_INFO << t.custom_version() << "\tsha256:" << t.sha256Hash();
+        break;
+      }
+    }
+  }
+  return 0;
+}
+
 struct SubCommand {
   const char *name;
   int (*main)(Config&, bpo::variables_map);
 };
 static SubCommand commands[] = {
   {"status", status_main},
+  {"list", list_main},
 };
 
 
