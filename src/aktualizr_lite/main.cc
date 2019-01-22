@@ -10,11 +10,19 @@
 
 namespace bpo = boost::program_options;
 
+static int status_main(Config &config, bpo::variables_map) {
+  GObjectUniquePtr<OstreeSysroot> sysroot_smart = OstreeManager::LoadSysroot(config.pacman.sysroot);
+  OstreeDeployment *deployment = ostree_sysroot_get_booted_deployment(sysroot_smart.get());
+  LOG_INFO << "Active image is: " << ostree_deployment_get_csum(deployment);
+  return 0;
+}
+
 struct SubCommand {
   const char *name;
   int (*main)(Config&, bpo::variables_map);
 };
 static SubCommand commands[] = {
+  {"status", status_main},
 };
 
 
