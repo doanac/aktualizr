@@ -38,6 +38,42 @@ static int list_main(Config &config, bpo::variables_map) {
   return 0;
 }
 
+static std::unique_ptr<Uptane::Target> latest_version(std::shared_ptr<SotaUptaneClient> client, Uptane::HardwareIdentifier &hwid) {
+  std::unique_ptr<Uptane::Target> rv;
+  for (auto& t : client->allTargets()) {
+    for (auto const& it : t.hardwareIds()) {
+      if (it == hwid) {
+        return std::unique_ptr<Uptane::Target>(new Uptane::Target(t));
+      }
+    }
+  }
+  throw std::runtime_error("Unable to find update");
+}
+
+static int update_main(Config &config, bpo::variables_map) {
+  auto storage = INvStorage::newStorage(config.storage);
+  auto client = SotaUptaneClient::newDefaultClient(config, storage);
+  Uptane::HardwareIdentifier hwid(config.provision.primary_ecu_hardware_id);
+
+  LOG_INFO << "Finding latest version to update to...";
+  auto target = latest_version(client, hwid);
+  LOG_INFO << "Updating to: " << *target;
+
+  std::vector<Uptane::Target> targets{*target};
+  auto result = client->downloadImages(targets);
+  if (result.status != result::DownloadStatus::kSuccess && result.status != result::DownloadStatus::kNothingToDownload) {
+    LOG_ERROR << "Unable to download update: " + result.message;
+    return 1;
+  }
+  auto iresult = client->PackageInstall(*target);
+  if (iresult.result_code.num_code != data::ResultCode::Numeric::kOk && iresult.result_code.num_code != data::ResultCode::Numeric::kNeedCompletion) {
+    LOG_ERROR << "Unable to install update: " << iresult.description;
+    return 1;
+  }
+  LOG_INFO << iresult.description;
+  return 0;
+}
+
 struct SubCommand {
   const char *name;
   int (*main)(Config&, bpo::variables_map);
@@ -45,6 +81,7 @@ struct SubCommand {
 static SubCommand commands[] = {
   {"status", status_main},
   {"list", list_main},
+  {"update", update_main},
 };
 
 

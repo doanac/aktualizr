@@ -111,6 +111,7 @@ class SotaUptaneClient {
   static Uptane::Targets getTrustedDelegation(const Uptane::Role &delegate_role, const Uptane::Targets &parent_targets,
                                               const Uptane::ImagesRepository &images_repo, INvStorage &storage,
                                               Uptane::Fetcher &fetcher);
+  data::InstallationResult PackageInstall(const Uptane::Target &target);
 
  private:
   FRIEND_TEST(Aktualizr, FullNoUpdates);
@@ -142,7 +143,6 @@ class SotaUptaneClient {
   Uptane::Exception getLastException() const { return last_exception; }
   bool isInstalledOnPrimary(const Uptane::Target &target);
   std::vector<Uptane::Target> findForEcu(const std::vector<Uptane::Target> &targets, const Uptane::EcuSerial &ecu_id);
-  data::InstallationResult PackageInstall(const Uptane::Target &target);
   data::InstallationResult PackageInstallSetResult(const Uptane::Target &target);
   void finalizeAfterReboot();
   void reportHwInfo();
