@@ -281,9 +281,13 @@ Uptane::Targets::Targets(RepositoryType repo, const Json::Value &json, Root &roo
 }
 
 void Uptane::TimestampMeta::init(const Json::Value &json) {
-  Json::Value hashes_list = json["signed"]["meta"]["snapshot.json"]["hashes"];
-  Json::Value meta_size = json["signed"]["meta"]["snapshot.json"]["length"];
-  Json::Value meta_version = json["signed"]["meta"]["snapshot.json"]["version"];
+  const char *key = "snapshot.json";
+  LOG_INFO << "ANDY isObject: " << json["signed"]["meta"][key].isObject();
+  if (!json["signed"]["meta"][key].isObject())
+    key = "snapshot";
+  Json::Value hashes_list = json["signed"]["meta"][key]["hashes"];
+  Json::Value meta_size = json["signed"]["meta"][key]["length"];
+  Json::Value meta_version = json["signed"]["meta"][key]["version"];
   if (!json.isObject() || json["signed"]["_type"] != "Timestamp" || !hashes_list.isObject() ||
       !meta_size.isIntegral() || !meta_version.isIntegral()) {
     throw Uptane::InvalidMetadata("", "timestamp", "invalid timestamp.json");
@@ -301,6 +305,7 @@ Uptane::TimestampMeta::TimestampMeta(const Json::Value &json) : BaseMeta(json) {
 
 Uptane::TimestampMeta::TimestampMeta(RepositoryType repo, const Json::Value &json, Root &root)
     : BaseMeta(repo, json, root) {
+LOG_INFO << "ANDY calling init";
   init(json);
 }
 

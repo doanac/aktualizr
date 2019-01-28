@@ -11,6 +11,7 @@ void ImagesRepository::resetMeta() {
 
 bool ImagesRepository::verifyTimestamp(const std::string& timestamp_raw) {
   try {
+LOG_INFO << "ANDY calling the thing";
     timestamp =
         TimestampMeta(RepositoryType::Image(), Utils::parseJSON(timestamp_raw), root);  // signature verification
   } catch (const Exception& e) {
