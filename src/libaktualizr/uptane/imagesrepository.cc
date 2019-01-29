@@ -16,6 +16,7 @@ LOG_INFO << "ANDY calling the thing";
         TimestampMeta(RepositoryType::Image(), Utils::parseJSON(timestamp_raw), root);  // signature verification
   } catch (const Exception& e) {
     LOG_ERROR << "Signature verification for timestamp metadata failed";
+    LOG_ERROR << "ANDY THE ERROR IS" << e.what();
     last_exception = e;
     return false;
   }

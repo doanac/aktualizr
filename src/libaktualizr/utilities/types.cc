@@ -1,4 +1,5 @@
 #include "utilities/types.h"
+#include "logging/logging.h"
 
 #include <stdexcept>
 #include <utility>
@@ -15,7 +16,8 @@ TimeStamp TimeStamp::Now() {
 
 TimeStamp::TimeStamp(std::string rfc3339) {
   if (rfc3339.length() != 20 || rfc3339[19] != 'Z') {
-    throw TimeStamp::InvalidTimeStamp();
+    LOG_ERROR << "ANDY its here: " << rfc3339 << "len=" << rfc3339.length();
+    // throw TimeStamp::InvalidTimeStamp();
   }
   time_ = rfc3339;
 }

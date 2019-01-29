@@ -13,13 +13,15 @@ namespace bpo = boost::program_options;
 static int initialize_main(Config &config, bpo::variables_map) {
   if (config.provision.primary_ecu_hardware_id.length() == 0) {
     LOG_INFO << "Probing TUF targets to find the primary ECU's hardware-id";
+    config.pacman.type = PackageManager::kNone;
     auto storage = INvStorage::newStorage(config.storage);
     auto client = SotaUptaneClient::newDefaultClient(config, storage);
 
-    GObjectUniquePtr<OstreeSysroot> sysroot_smart = OstreeManager::LoadSysroot(config.pacman.sysroot);
+    /*GObjectUniquePtr<OstreeSysroot> sysroot_smart = OstreeManager::LoadSysroot(config.pacman.sysroot);
     OstreeDeployment *deployment = ostree_sysroot_get_booted_deployment(sysroot_smart.get());
-    auto active = ostree_deployment_get_csum(deployment);
-
+    auto active = ostree_deployment_get_csum(deployment);*/
+    const char *active = "foobar";
+    LOG_INFO << "ANDY 1";
     auto targets = client->GetRepoTargets();
     for (auto i = targets.rbegin(); i != targets.rend(); ++i) {
       if ((*i).sha256Hash() == active) {
@@ -32,6 +34,7 @@ static int initialize_main(Config &config, bpo::variables_map) {
       throw std::runtime_error("Unable to find current active image in targets.json");
     }
   }
+    LOG_INFO << "ANDY 2";
   boost::filesystem::path p = config.storage.path / "lite.toml";
   std::ofstream os(p.c_str(), std::ofstream::out);
   config.writeToStream(os);
