@@ -38,25 +38,31 @@ static int list_main(Config &config, bpo::variables_map) {
   return 0;
 }
 
-static std::unique_ptr<Uptane::Target> latest_version(std::shared_ptr<SotaUptaneClient> client, Uptane::HardwareIdentifier &hwid) {
+static std::unique_ptr<Uptane::Target> find_target(std::shared_ptr<SotaUptaneClient> client, Uptane::HardwareIdentifier &hwid, const std::string &version) {
   std::unique_ptr<Uptane::Target> rv;
   for (auto& t : client->allTargets()) {
     for (auto const& it : t.hardwareIds()) {
       if (it == hwid) {
-        return std::unique_ptr<Uptane::Target>(new Uptane::Target(t));
+        if(version == "latest" || version == t.custom_version()) {
+          return std::unique_ptr<Uptane::Target>(new Uptane::Target(t));
+        }
       }
     }
   }
   throw std::runtime_error("Unable to find update");
 }
 
-static int update_main(Config &config, bpo::variables_map) {
+static int update_main(Config &config, bpo::variables_map variables_map) {
   auto storage = INvStorage::newStorage(config.storage);
   auto client = SotaUptaneClient::newDefaultClient(config, storage);
   Uptane::HardwareIdentifier hwid(config.provision.primary_ecu_hardware_id);
 
-  LOG_INFO << "Finding latest version to update to...";
-  auto target = latest_version(client, hwid);
+  std::string version("latest");
+  if (variables_map.count("update-name") > 0) {
+    version = variables_map["update-name"].as<std::string>();
+  }
+  LOG_INFO << "Finding " << version << " to update to...";
+  auto target = find_target(client, hwid, version);
   LOG_INFO << "Updating to: " << *target;
 
   std::vector<Uptane::Target> targets{*target};
@@ -114,6 +120,7 @@ bpo::variables_map parse_options(int argc, char *argv[]) {
       ("repo-server", bpo::value<std::string>(), "url of the uptane repo repository")
       ("ostree-server", bpo::value<std::string>(), "url of the ostree repository")
       ("primary-ecu-hardware-id", bpo::value<std::string>(), "hardware ID of primary ecu")
+      ("update-name", bpo::value<std::string>(), "optional name of the update when running \"update\". default=latest")
       ("command", bpo::value<std::string>(), subs.c_str());
   // clang-format on
 
