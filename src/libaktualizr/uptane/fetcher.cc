@@ -2,6 +2,9 @@
 
 #ifdef BUILD_OSTREE
 #include "package_manager/ostreemanager.h"  // TODO: Hide behind PackageManagerInterface
+#ifdef BUILD_DOCKERAPP
+#include "package_manager/dockerappmanager.h"
+#endif
 #endif
 
 namespace Uptane {
@@ -145,8 +148,16 @@ bool Fetcher::fetchVerifyTarget(const Target& target) {
       KeyManager keys(storage, config.keymanagerConfig());
       keys.loadKeys();
       std::function<void()> check_pause = std::bind(&Fetcher::checkPause, this);
+#ifdef BUILD_DOCKERAPP
+      // Its safe to use DockerAppManager::pull for both kOstree and kOstreeDockerApp
+      // since DockerAppManager is a pass-through. However, refactoring of this logic
+      // into the packagemanagerinterface is probably the real fix.
+      data::InstallationResult install_res = DockerAppManager::pull(config.pacman.sysroot, config.pacman.ostree_server,
+                                                                    keys, target, check_pause, progress_cb);
+#else
       data::InstallationResult install_res = OstreeManager::pull(config.pacman.sysroot, config.pacman.ostree_server,
                                                                  keys, target, check_pause, progress_cb);
+#endif  // BUILD_DOCKERAPP
       result = install_res.success;
 #else
       LOG_ERROR << "Could not pull OSTree target. Aktualizr was built without OSTree support!";
