@@ -57,8 +57,10 @@ class OstreeManager : public PackageManagerInterface {
                                        const std::function<void()> &pause_cb = {},
                                        OstreeProgressCb progress_cb = nullptr);
 
- private:
+ protected:
   PackageConfig config;
+
+ private:
   std::shared_ptr<INvStorage> storage_;
   std::shared_ptr<Bootloader> bootloader_;
 };
