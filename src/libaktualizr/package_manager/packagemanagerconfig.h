@@ -16,6 +16,10 @@ struct PackageConfig {
   std::string ostree_server;
   boost::filesystem::path packages_file{"/usr/package.manifest"};
 
+#ifdef BUILD_DOCKERAPP
+  std::vector<std::string> docker_apps;
+#endif
+
   // Options for simulation (to be used with kNone)
   bool fake_need_reboot{false};
 
