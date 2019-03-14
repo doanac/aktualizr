@@ -121,7 +121,10 @@ std::vector<Uptane::Target> SotaUptaneClient::findForEcu(const std::vector<Uptan
 data::InstallationResult SotaUptaneClient::PackageInstall(const Uptane::Target &target) {
   LOG_INFO << "Installing package using " << package_manager_->name() << " package manager";
   try {
-    return package_manager_->install(target);
+    // The DockerAppManager needs the actual Target as defined targets.json so
+    // it can access the custom data.
+    auto repo_target = findTargetInDelegationTree(target);
+    return package_manager_->install(*repo_target);
   } catch (std::exception &ex) {
     return data::InstallationResult(data::ResultCode::Numeric::kInstallFailed, ex.what());
   }
