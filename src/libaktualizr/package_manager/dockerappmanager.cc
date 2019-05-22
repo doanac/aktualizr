@@ -67,16 +67,16 @@ bool DockerAppManager::iterate_apps(const Uptane::Target &target, DockerAppCb cb
 
   for (const auto t : Uptane::LazyTargetsList(repo, storage_, fake_fetcher_)) {
     for (Json::ValueIterator i = apps.begin(); i != apps.end(); ++i) {
-      for (auto app : config.docker_apps) {
-        if ((*i).isObject() && (*i).isMember("filename")) {
+      if ((*i).isObject() && (*i).isMember("filename")) {
+        for (auto app : config.docker_apps) {
           if (i.key().asString() == app && (*i)["filename"].asString() == t.filename()) {
             if (!cb(app, t)) {
               res = false;
             }
           }
-        } else {
-            LOG_ERROR << "Invalid custom data for docker-app: " << i.key().asString() << " -> " << *i;
         }
+      } else {
+          LOG_ERROR << "Invalid custom data for docker-app: " << i.key().asString() << " -> " << *i;
       }
     }
   }
