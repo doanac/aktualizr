@@ -37,7 +37,18 @@ static std::shared_ptr<SotaUptaneClient> liteClient(Config &config) {
     storage->storeEcuSerials(ecu_serials);
   }
 
-  auto http_client = std::make_shared<HttpClient>();
+  std::vector<std::string> headers;
+  GObjectUniquePtr<OstreeSysroot> sysroot_smart = OstreeManager::LoadSysroot(config.pacman.sysroot);
+  OstreeDeployment *deployment = ostree_sysroot_get_booted_deployment(sysroot_smart.get());
+  std::string header("x-ats-ostreehash: ");
+  if (deployment != nullptr) {
+    header += ostree_deployment_get_csum(deployment);
+  } else {
+    header += "?";
+  }
+  headers.push_back(header);
+
+  auto http_client = std::make_shared<HttpClient>(&headers);
   auto bootloader = std::make_shared<Bootloader>(config.bootloader, *storage);
   auto report_queue = std::make_shared<ReportQueue>(config, http_client);
 
