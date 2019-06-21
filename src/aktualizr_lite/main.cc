@@ -16,25 +16,45 @@
 
 namespace bpo = boost::program_options;
 
-static void finalizeIfNeeded(INvStorage &storage, PackageConfig &config) {
+#ifdef BUILD_DOCKERAPP
+static void add_apps_header(std::vector<std::string> &headers, PackageConfig &config) {
+  if (config.type == PackageManager::kOstreeDockerApp) {
+    headers.emplace_back("x-ats-dockerapps: " + boost::algorithm::join(config.docker_apps, ","));
+  }
+}
+#else
+#define add_apps_header(headers, config) \
+  {}
+#endif
+
+static Uptane::Target finalizeIfNeeded(INvStorage &storage, PackageConfig &config) {
   std::vector<Uptane::Target> installed_versions;
   size_t pending_index = SIZE_MAX;
+
+  GObjectUniquePtr<OstreeSysroot> sysroot_smart = OstreeManager::LoadSysroot(config.sysroot);
+  OstreeDeployment *booted_deployment = ostree_sysroot_get_booted_deployment(sysroot_smart.get());
+  std::string current_hash = ostree_deployment_get_csum(booted_deployment);
+  if (booted_deployment == nullptr) {
+    throw std::runtime_error("Could not get booted deployment in " + config.sysroot.string());
+  }
+
   storage.loadInstalledVersions("", &installed_versions, nullptr, &pending_index);
-
   if (pending_index < installed_versions.size()) {
-    GObjectUniquePtr<OstreeSysroot> sysroot_smart = OstreeManager::LoadSysroot(config.sysroot);
-    OstreeDeployment *booted_deployment = ostree_sysroot_get_booted_deployment(sysroot_smart.get());
-    if (booted_deployment == nullptr) {
-      throw std::runtime_error("Could not get booted deployment in " + config.sysroot.string());
-    }
-    std::string current_hash = ostree_deployment_get_csum(booted_deployment);
-
     const Uptane::Target &target = installed_versions[pending_index];
     if (current_hash == target.sha256Hash()) {
       LOG_INFO << "Marking target install complete for: " << target;
       storage.saveInstalledVersion("", target, InstalledVersionUpdateMode::kCurrent);
+      return target;
     }
   }
+
+  std::vector<Uptane::Target>::reverse_iterator it;
+  for (it = installed_versions.rbegin(); it != installed_versions.rend(); it++) {
+    if (it->sha256Hash() == current_hash) {
+      return *it;
+    }
+  }
+  return Uptane::Target::Unknown();
 }
 
 static std::shared_ptr<SotaUptaneClient> liteClient(Config &config, std::shared_ptr<INvStorage> storage) {
@@ -60,7 +80,23 @@ static std::shared_ptr<SotaUptaneClient> liteClient(Config &config, std::shared_
     storage->storeEcuSerials(ecu_serials);
   }
 
-  auto http_client = std::make_shared<HttpClient>();
+  std::vector<std::string> headers;
+  GObjectUniquePtr<OstreeSysroot> sysroot_smart = OstreeManager::LoadSysroot(config.pacman.sysroot);
+  OstreeDeployment *deployment = ostree_sysroot_get_booted_deployment(sysroot_smart.get());
+  std::string header("x-ats-ostreehash: ");
+  if (deployment != nullptr) {
+    header += ostree_deployment_get_csum(deployment);
+  } else {
+    header += "?";
+  }
+  headers.push_back(header);
+  add_apps_header(headers, config.pacman);
+
+  Uptane::Target tgt = finalizeIfNeeded(*storage, config.pacman);
+  headers.emplace_back("x-ats-target: " + tgt.filename());
+  headers.emplace_back("x-ats-tags: " + boost::algorithm::join(config.pacman.tags, ","));
+
+  auto http_client = std::make_shared<HttpClient>(&headers);
   auto bootloader = std::make_shared<Bootloader>(config.bootloader, *storage);
   auto report_queue = std::make_shared<ReportQueue>(config, http_client);
 
@@ -68,7 +104,6 @@ static std::shared_ptr<SotaUptaneClient> liteClient(Config &config, std::shared_
   keys.copyCertsToCurl(*http_client);
 
   auto client = std::make_shared<SotaUptaneClient>(config, storage, http_client, bootloader, report_queue);
-  finalizeIfNeeded(*storage, config.pacman);
   return client;
 }
 
