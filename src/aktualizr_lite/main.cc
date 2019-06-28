@@ -125,6 +125,9 @@ static int list_main(Config &config, const bpo::variables_map &unused) {
 
   LOG_INFO << "Updates available to " << hwid << ":";
   for (auto &t : client->allTargets()) {
+    if (!target_has_tags(t, config.pacman.tags)) {
+      continue;
+    }
     for (auto const &it : t.hardwareIds()) {
       if (it == hwid) {
         log_info_target("", config, t);
@@ -136,7 +139,8 @@ static int list_main(Config &config, const bpo::variables_map &unused) {
 }
 
 static std::unique_ptr<Uptane::Target> find_target(const std::shared_ptr<SotaUptaneClient> &client,
-                                                   Uptane::HardwareIdentifier &hwid, const std::string &version) {
+                                                   Uptane::HardwareIdentifier &hwid,
+                                                   const std::vector<std::string> &tags, const std::string &version) {
   std::unique_ptr<Uptane::Target> rv;
   if (!client->updateImagesMeta()) {
     LOG_WARNING << "Unable to update latest metadata, using local copy";
@@ -149,6 +153,9 @@ static std::unique_ptr<Uptane::Target> find_target(const std::shared_ptr<SotaUpt
   bool find_latest = (version == "latest");
   std::unique_ptr<Uptane::Target> latest = nullptr;
   for (auto &t : client->allTargets()) {
+    if (!target_has_tags(t, tags)) {
+      continue;
+    }
     for (auto const &it : t.hardwareIds()) {
       if (it == hwid) {
         if (find_latest) {
@@ -197,7 +204,11 @@ static int update_main(Config &config, const bpo::variables_map &variables_map) 
     version = variables_map["update-name"].as<std::string>();
   }
   LOG_INFO << "Finding " << version << " to update to...";
-  auto target = find_target(client, hwid, version);
+  auto target = find_target(client, hwid, config.pacman.tags, version);
+  if (target == nullptr) {
+    LOG_INFO << "Already up-to-date";
+    return 0;
+  }
   LOG_INFO << "Updating to: " << *target;
   return do_update(*client, *storage, *target);
 }
