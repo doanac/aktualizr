@@ -83,6 +83,20 @@ static int list_main(Config &config, const bpo::variables_map &unused) {
 
   LOG_INFO << "Updates available to " << hwid << ":";
   for (auto &t : client->allTargets()) {
+    if (!config.pacman.tags.empty()) {
+      bool found = false;
+      auto tags = t.custom_data()["tags"];
+      for (Json::ValueIterator i = tags.begin(); i != tags.end(); ++i) {
+        auto tag = (*i).asString();
+        if (std::find(config.pacman.tags.begin(), config.pacman.tags.end(), tag) != config.pacman.tags.end()) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        continue;  // Target doesn't match any configured tags
+      }
+    }
     for (auto const &it : t.hardwareIds()) {
       if (it == hwid) {
         auto name = t.filename();
