@@ -1,6 +1,11 @@
+#ifndef AKTUALIZR_LITE_HELPERS
+#define AKTUALIZR_LITE_HELPERS
+
 #include <string>
 
 #include <string.h>
+
+#include "uptane/tuf.h"
 
 struct Version {
   std::string raw_ver;
@@ -8,3 +13,7 @@ struct Version {
 
   bool operator<(const Version& other) { return strverscmp(raw_ver.c_str(), other.raw_ver.c_str()) < 0; }
 };
+
+bool target_has_tags(const Uptane::Target& t, const std::vector<std::string>& config_tags);
+
+#endif  // AKTUALIZR_LITE_HELPERS
