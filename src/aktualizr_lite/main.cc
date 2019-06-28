@@ -120,6 +120,9 @@ static int list_main(Config &config, const bpo::variables_map &unused) {
 
   LOG_INFO << "Updates available to " << hwid << ":";
   for (auto &t : client->allTargets()) {
+    if (!target_has_tags(t, config.pacman.tags)) {
+      continue;
+    }
     for (auto const &it : t.hardwareIds()) {
       if (it == hwid) {
         log_info_target("", config, t);
