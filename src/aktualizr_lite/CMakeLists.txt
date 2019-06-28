@@ -1,4 +1,4 @@
-set(AKTUALIZR_LITE_SRC main.cc)
+set(AKTUALIZR_LITE_SRC main.cc helpers.cc)
 set(AKTUALIZR_LITE_HEADERS helpers.h)
 
 if(BUILD_OSTREE)
@@ -22,7 +22,7 @@ add_library(t_lite-mock SHARED ostree_mock.cc)
 
 endif(BUILD_OSTREE)
 
-add_aktualizr_test(NAME lite-helpers SOURCES helpers_test.cc)
+add_aktualizr_test(NAME lite-helpers SOURCES helpers.cc helpers_test.cc)
 
 aktualizr_source_file_checks(main.cc ${AKTUALIZR_LITE_SRC} ${AKTUALIZR_LITE_HEADERS} helpers_test.cc ostree_mock.cc)
 # vim: set tabstop=4 shiftwidth=4 expandtab:
