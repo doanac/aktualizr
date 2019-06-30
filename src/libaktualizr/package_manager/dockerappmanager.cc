@@ -98,6 +98,10 @@ bool DockerAppManager::fetchTarget(const Uptane::Target &target, Uptane::Fetcher
 
 data::InstallationResult DockerAppManager::install(const Uptane::Target &target) const {
   auto res = OstreeManager::install(target);
+  if (config.docker_apps.empty()) {
+    return res;
+  }
+  Utils::writeFile(config.docker_apps_root / "target_apps", target.custom_data()["docker_apps"], true);
   auto cb = [this](const std::string &app, const Uptane::Target &app_target) {
     LOG_INFO << "Installing " << app << " -> " << app_target;
     std::stringstream ss;
@@ -131,3 +135,17 @@ TargetStatus DockerAppManager::verifyTarget(const Uptane::Target &target) const 
   }
   return TargetStatus::kGood;
 }
+
+Uptane::Target DockerAppManager::getCurrent() const {
+  auto target = fakeGetCurrent ? Uptane::Target::Unknown() : OstreeManager::getCurrent();
+  Json::Value apps;
+
+  std::ifstream apps_stream((config.docker_apps_root / ("target_apps")).c_str());
+  if (!apps_stream.fail()) {
+    auto custom = target.custom_data();
+    apps_stream >> custom["docker_apps"];
+    target.updateCustom(custom);
+  }
+  return target;
+}
+bool DockerAppManager::fakeGetCurrent = false;

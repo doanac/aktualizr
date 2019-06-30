@@ -5,6 +5,7 @@
 
 #include "config/config.h"
 #include "http/httpclient.h"
+#include "package_manager/dockerappmanager.h"
 #include "package_manager/packagemanagerfactory.h"
 #include "package_manager/packagemanagerinterface.h"
 #include "primary/sotauptaneclient.h"
@@ -81,9 +82,13 @@ TEST(DockerAppManager, DockerApp_Fetch) {
   KeyManager keys(storage, config.keymanagerConfig());
   auto http = std::make_shared<HttpClient>();
   auto client = newTestClient(config, storage, http, nullptr);
-  ASSERT_TRUE(client->updateImagesMeta());
 
-  std::string targets = Utils::readFile(repo / "repo/repo/targets.json");
+  // Make sure we can read an empty target
+  auto current = client->package_manager_->getCurrent();
+  ASSERT_EQ("", current.custom_data()["docker_apps"].asString());
+
+  ASSERT_TRUE(client->updateImagesMeta());
+  std::string targets = Utils::readFile(repo / "repo/image/targets.json");
   LOG_INFO << "Repo targets " << targets;
 
   bool result = client->package_manager_->fetchTarget(target, *(client->uptane_fetcher), keys, progress_cb, nullptr);
@@ -100,6 +105,9 @@ TEST(DockerAppManager, DockerApp_Fetch) {
   client->package_manager_->install(target);
   std::string content = Utils::readFile(config.pacman.docker_apps_root / "app1/docker-compose.yml");
   ASSERT_EQ("DOCKER-APP RENDER OUTPUT\nfake contents of a docker app\n", content);
+
+  current = client->package_manager_->getCurrent();
+  ASSERT_EQ("foo.dockerapp", current.custom_data()["docker_apps"]["app1"]["filename"].asString());
 
   setenv("DOCKER_APP_FAIL", "1", 1);
   ASSERT_EQ(TargetStatus::kInvalid, client->VerifyTarget(target));
@@ -129,6 +137,10 @@ int main(int argc, char** argv) {
   test_sysroot = (temp_dir.Path() / "ostree_repo").string();
 
   TestUtils::waitForServer(treehub_server + "/");
+
+  // OstreeManager::getCurrent throws an exception because there's not
+  // a real booted deployment.
+  DockerAppManager::fakeGetCurrent = true;
 
   return RUN_ALL_TESTS();
 }

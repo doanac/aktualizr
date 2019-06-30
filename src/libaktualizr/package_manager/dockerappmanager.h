@@ -18,6 +18,9 @@ class DockerAppManager : public OstreeManager {
   data::InstallationResult install(const Uptane::Target &target) const override;
   TargetStatus verifyTarget(const Uptane::Target &target) const override;
   std::string name() const override { return "ostree+docker-app"; }
+  Uptane::Target getCurrent() const override;
+
+  static bool fakeGetCurrent;
 
  private:
   bool iterate_apps(const Uptane::Target &target, const DockerAppCb &cb) const;
@@ -26,4 +29,5 @@ class DockerAppManager : public OstreeManager {
   // and we just need to construct a dummy one to make the compiler happy.
   std::shared_ptr<Uptane::Fetcher> fake_fetcher_;
 };
+
 #endif  // DOCKERAPPMGR_H_
