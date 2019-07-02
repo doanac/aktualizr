@@ -181,6 +181,29 @@ static int update_main(Config &config, const bpo::variables_map &variables_map) 
   return 0;
 }
 
+static int daemon_main(Config &config, const bpo::variables_map &variables_map) {
+  auto client = liteClient(config);
+  bool compareDockerApps = (config.pacman.type == PackageManager::kOstreeDockerApp);
+  Uptane::HardwareIdentifier hwid(config.provision.primary_ecu_hardware_id);
+
+  auto current = client->getCurrent();
+  LOG_INFO << "Active image is: " << current;
+
+  unsigned int interval = 300;
+  if (variables_map.count("interval") > 0) {
+    interval = variables_map["interval"].as<unsigned int>();
+  }
+
+  while (true) {
+    auto target = find_target(client, hwid, "latest");
+    if (!targets_eq(*target, current, compareDockerApps)) {
+      LOG_INFO << "Updating base image to: " << *target;
+    }
+    sleep(interval);
+  }
+  return 0;
+}
+
 struct SubCommand {
   const char *name;
   int (*main)(Config &, const bpo::variables_map &);
@@ -189,6 +212,7 @@ static SubCommand commands[] = {
     {"status", status_main},
     {"list", list_main},
     {"update", update_main},
+    {"daemon", daemon_main},
 };
 
 void check_info_options(const bpo::options_description &description, const bpo::variables_map &vm) {
@@ -223,6 +247,7 @@ bpo::variables_map parse_options(int argc, char *argv[]) {
       ("ostree-server", bpo::value<std::string>(), "url of the ostree repository")
       ("primary-ecu-hardware-id", bpo::value<std::string>(), "hardware ID of primary ecu")
       ("update-name", bpo::value<std::string>(), "optional name of the update when running \"update\". default=latest")
+      ("interval", bpo::value<unsigned int>(), "optional interval in seconds to poll for update when in daemon mode. default=300")
       ("command", bpo::value<std::string>(), subs.c_str());
   // clang-format on
 
