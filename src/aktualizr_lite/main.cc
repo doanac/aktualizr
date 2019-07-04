@@ -222,6 +222,12 @@ static int update_main(Config &config, const bpo::variables_map &variables_map) 
 }
 
 static int daemon_main(Config &config, const bpo::variables_map &variables_map) {
+  auto rebootCmd = variables_map["reboot-command"].as<boost::filesystem::path>();
+  if (access(rebootCmd.c_str(), X_OK) != 0) {
+    LOG_ERROR << "reboot command: " << rebootCmd << " is not executable";
+    return 1;
+  }
+
   auto storage = INvStorage::newStorage(config.storage);
   auto client = liteClient(config, storage);
   bool compareDockerApps = should_compare_docker_apps(config);
@@ -244,7 +250,10 @@ static int daemon_main(Config &config, const bpo::variables_map &variables_map) 
     if (!targets_eq(*target, current, compareDockerApps)) {
       LOG_INFO << "Updating base image to: " << *target;
       if (do_update(*client, *storage, *target) == 0) {
-        // TODO reboot
+        if (std::system(rebootCmd.c_str()) != 0) {
+          LOG_ERROR << "Unable to reboot system";
+          return 1;
+        }
       }
     }
     sleep(interval);
@@ -265,6 +274,11 @@ static SubCommand commands[] = {
 
 void check_info_options(const bpo::options_description &description, const bpo::variables_map &vm) {
   if (vm.count("help") != 0 || vm.count("command") == 0) {
+    std::cout << description << '\n';
+    exit(EXIT_SUCCESS);
+  }
+  if (vm["command"].as<std::string>() == "daemon" && vm.count("reboot-command") == 0) {
+    std::cout << "ERROR: --reboot-command required when running as daemon\n";
     std::cout << description << '\n';
     exit(EXIT_SUCCESS);
   }
@@ -296,6 +310,7 @@ bpo::variables_map parse_options(int argc, char *argv[]) {
       ("primary-ecu-hardware-id", bpo::value<std::string>(), "hardware ID of primary ecu")
       ("update-name", bpo::value<std::string>(), "optional name of the update when running \"update\". default=latest")
       ("interval", bpo::value<unsigned int>(), "optional interval in seconds to poll for update when in daemon mode. default=300")
+      ("reboot-command", bpo::value<boost::filesystem::path>(), "reboot command to call after an update is applied from daemon mode")
       ("command", bpo::value<std::string>(), subs.c_str());
   // clang-format on
 
