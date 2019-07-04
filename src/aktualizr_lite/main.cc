@@ -263,6 +263,11 @@ static int update_main(Config &config, const bpo::variables_map &variables_map) 
 }
 
 static int daemon_main(Config &config, const bpo::variables_map &variables_map) {
+  if (access(config.bootloader.reboot_command.c_str(), X_OK) != 0) {
+    LOG_ERROR << "reboot command: " << config.bootloader.reboot_command << " is not executable";
+    return 1;
+  }
+
   auto storage = INvStorage::newStorage(config.storage);
   auto client = liteClient(config, storage);
   bool compareDockerApps = should_compare_docker_apps(config);
@@ -285,7 +290,10 @@ static int daemon_main(Config &config, const bpo::variables_map &variables_map) 
     if (target != nullptr && !targets_eq(*target, current, compareDockerApps)) {
       LOG_INFO << "Updating base image to: " << *target;
       if (do_update(*client, *storage, *target) == 0) {
-        // TODO reboot
+        if (std::system(config.bootloader.reboot_command.c_str()) != 0) {
+          LOG_ERROR << "Unable to reboot system";
+          return 1;
+        }
       }
     }
     sleep(interval);
