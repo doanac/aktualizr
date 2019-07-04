@@ -1,3 +1,4 @@
+#include <sys/file.h>
 #include <unistd.h>
 #include <iostream>
 
@@ -176,12 +177,32 @@ static std::unique_ptr<Uptane::Target> find_target(const std::shared_ptr<SotaUpt
   throw std::runtime_error("Unable to find update");
 }
 
-static int do_update(SotaUptaneClient &client, INvStorage &storage, Uptane::Target &target) {
+static int get_lock(const char *lockfile) {
+  int fd = open(lockfile, O_RDWR | O_CREAT | O_APPEND, 0666);
+  if (fd < 0) {
+    LOG_ERROR << "Unable to open lock file";
+    return -1;
+  }
+  LOG_INFO << "Aquiring lock";
+  if (flock(fd, LOCK_EX) < 0) {
+    LOG_ERROR << "Unable to aquire lock";
+    close(fd);
+    return -1;
+  }
+  return fd;
+}
+
+static int do_update(SotaUptaneClient &client, INvStorage &storage, Uptane::Target &target, const char *lockfile) {
   std::vector<Uptane::Target> targets{target};
   auto result = client.downloadImages(targets);
   if (result.status != result::DownloadStatus::kSuccess &&
       result.status != result::DownloadStatus::kNothingToDownload) {
     LOG_ERROR << "Unable to download update: " + result.message;
+    return 1;
+  }
+
+  int lockfd = 0;
+  if (lockfile != nullptr && (lockfd = get_lock(lockfile)) < 0) {
     return 1;
   }
 
@@ -193,6 +214,8 @@ static int do_update(SotaUptaneClient &client, INvStorage &storage, Uptane::Targ
     storage.saveInstalledVersion("", target, InstalledVersionUpdateMode::kCurrent);
   } else {
     LOG_ERROR << "Unable to install update: " << iresult.description;
+    // let go of the lock since we couldn't update
+    close(lockfd);
     return 1;
   }
   LOG_INFO << iresult.description;
@@ -218,7 +241,7 @@ static int update_main(Config &config, const bpo::variables_map &variables_map) 
   LOG_INFO << "Finding " << version << " to update to...";
   auto target = find_target(client, hwid, version);
   LOG_INFO << "Updating to: " << *target;
-  return do_update(*client, *storage, *target);
+  return do_update(*client, *storage, *target, nullptr);
 }
 
 static int daemon_main(Config &config, const bpo::variables_map &variables_map) {
@@ -226,6 +249,12 @@ static int daemon_main(Config &config, const bpo::variables_map &variables_map) 
   if (access(rebootCmd.c_str(), X_OK) != 0) {
     LOG_ERROR << "reboot command: " << rebootCmd << " is not executable";
     return 1;
+  }
+  const char *lockfile = nullptr;
+  boost::filesystem::path lockfilePath;
+  if (variables_map.count("update-lockfile") > 0) {
+    lockfilePath = variables_map["update-lockfile"].as<boost::filesystem::path>();
+    lockfile = lockfilePath.c_str();
   }
 
   auto storage = INvStorage::newStorage(config.storage);
@@ -249,7 +278,7 @@ static int daemon_main(Config &config, const bpo::variables_map &variables_map) 
     auto target = find_target(client, hwid, "latest");
     if (!targets_eq(*target, current, compareDockerApps)) {
       LOG_INFO << "Updating base image to: " << *target;
-      if (do_update(*client, *storage, *target) == 0) {
+      if (do_update(*client, *storage, *target, lockfile) == 0) {
         if (std::system(rebootCmd.c_str()) != 0) {
           LOG_ERROR << "Unable to reboot system";
           return 1;
@@ -311,6 +340,7 @@ bpo::variables_map parse_options(int argc, char *argv[]) {
       ("update-name", bpo::value<std::string>(), "optional name of the update when running \"update\". default=latest")
       ("interval", bpo::value<unsigned int>(), "optional interval in seconds to poll for update when in daemon mode. default=300")
       ("reboot-command", bpo::value<boost::filesystem::path>(), "reboot command to call after an update is applied from daemon mode")
+      ("update-lockfile", bpo::value<boost::filesystem::path>(), "If provided, an flock(2) is applied to this file before performing an update in daemon mode")
       ("command", bpo::value<std::string>(), subs.c_str());
   // clang-format on
 
