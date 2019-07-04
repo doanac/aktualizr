@@ -150,6 +150,26 @@ static std::unique_ptr<Uptane::Target> find_target(const std::shared_ptr<SotaUpt
   throw std::runtime_error("Unable to find update");
 }
 
+static int do_update(SotaUptaneClient &client, Uptane::Target &target) {
+  std::vector<Uptane::Target> targets{target};
+  auto result = client.downloadImages(targets);
+  if (result.status != result::DownloadStatus::kSuccess &&
+      result.status != result::DownloadStatus::kNothingToDownload) {
+    LOG_ERROR << "Unable to download update: " + result.message;
+    return 1;
+  }
+  auto iresult = client.PackageInstall(target);
+  if (iresult.result_code.num_code == data::ResultCode::Numeric::kNeedCompletion) {
+    LOG_INFO << "Update complete. Please reboot the device to activate";
+  } else if (iresult.result_code.num_code != data::ResultCode::Numeric::kOk &&
+             iresult.result_code.num_code != data::ResultCode::Numeric::kNeedCompletion) {
+    LOG_ERROR << "Unable to install update: " << iresult.description;
+    return 1;
+  }
+  LOG_INFO << iresult.description;
+  return 0;
+}
+
 static int update_main(Config &config, const bpo::variables_map &variables_map) {
   auto client = liteClient(config);
   Uptane::HardwareIdentifier hwid(config.provision.primary_ecu_hardware_id);
@@ -162,23 +182,7 @@ static int update_main(Config &config, const bpo::variables_map &variables_map) 
   auto target = find_target(client, hwid, version);
   LOG_INFO << "Updating to: " << *target;
 
-  std::vector<Uptane::Target> targets{*target};
-  auto result = client->downloadImages(targets);
-  if (result.status != result::DownloadStatus::kSuccess &&
-      result.status != result::DownloadStatus::kNothingToDownload) {
-    LOG_ERROR << "Unable to download update: " + result.message;
-    return 1;
-  }
-  auto iresult = client->PackageInstall(*target);
-  if (iresult.result_code.num_code == data::ResultCode::Numeric::kNeedCompletion) {
-    LOG_INFO << "Update complete. Please reboot the device to activate";
-  } else if (iresult.result_code.num_code != data::ResultCode::Numeric::kOk &&
-             iresult.result_code.num_code != data::ResultCode::Numeric::kNeedCompletion) {
-    LOG_ERROR << "Unable to install update: " << iresult.description;
-    return 1;
-  }
-  LOG_INFO << iresult.description;
-  return 0;
+  return do_update(*client, *target);
 }
 
 static int daemon_main(Config &config, const bpo::variables_map &variables_map) {
@@ -198,6 +202,9 @@ static int daemon_main(Config &config, const bpo::variables_map &variables_map) 
     auto target = find_target(client, hwid, "latest");
     if (!targets_eq(*target, current, compareDockerApps)) {
       LOG_INFO << "Updating base image to: " << *target;
+      if (do_update(*client, *target) == 0) {
+        // TODO reboot
+      }
     }
     sleep(interval);
   }
