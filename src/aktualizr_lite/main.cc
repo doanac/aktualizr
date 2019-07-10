@@ -79,12 +79,16 @@ static std::shared_ptr<SotaUptaneClient> liteClient(Config &config, std::shared_
 
 static int status_main(Config &config, const bpo::variables_map &unused) {
   (void)unused;
-  GObjectUniquePtr<OstreeSysroot> sysroot_smart = OstreeManager::LoadSysroot(config.pacman.sysroot);
-  OstreeDeployment *deployment = ostree_sysroot_get_booted_deployment(sysroot_smart.get());
-  if (deployment == nullptr) {
+  auto target = liteClient(config, nullptr)->getCurrent();
+
+  if (target == Uptane::Target::Unknown()) {
     LOG_INFO << "No active deployment found";
   } else {
-    LOG_INFO << "Active image is: " << ostree_deployment_get_csum(deployment);
+    auto name = target.filename();
+    if (target.custom_version().length() > 0) {
+      name = target.custom_version();
+    }
+    LOG_INFO << "Active image is: " << name << "\tsha256:" << target.sha256Hash();
   }
   return 0;
 }
