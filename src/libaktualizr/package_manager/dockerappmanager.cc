@@ -122,7 +122,26 @@ Uptane::Target DockerAppManager::getCurrent() const {
     auto custom = target.custom_data();
     apps_stream >> custom["docker_apps"];
     target.updateCustom(custom);
+
+    auto cb = [this](const std::string &app, const Uptane::Target &app_target) {
+      LOG_INFO << "Starting " << app << " -> " << app_target;
+      std::stringstream ss;
+      try {
+        ss << *storage_->openTargetFile(app_target);
+      } catch (const StorageTargetRHandle::ReadError &ex) {
+        // This can be okay. It could be the first time this was called with a
+        // docker app configured and therefore the "install" method hasn't been called
+        LOG_WARNING << "Unable to load docker-app from storage for " << app;
+        return false;
+      }
+      DockerApp dapp(app, config);
+      return dapp.render(ss.str()) && dapp.start();
+    };
+    if (!iterate_apps(target, cb)) {
+      LOG_ERROR << "Unable to start docker apps";
+    }
   }
+
   return target;
 }
 bool DockerAppManager::fakeGetCurrent = false;
