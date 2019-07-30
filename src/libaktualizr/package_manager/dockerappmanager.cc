@@ -12,6 +12,7 @@ struct DockerApp {
 
   bool render(const std::string &app_content) {
     auto bin = boost::filesystem::canonical(app_bin).string();
+    LOG_WARNING << "ANDY TMP writing content: " << app_content;
     Utils::writeFile(app_root / (name + ".dockerapp"), app_content);
     std::string cmd("cd " + app_root.string() + " && " + bin + " app render " + name);
     if (!app_params.empty()) {
