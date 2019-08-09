@@ -17,14 +17,21 @@
 
 namespace bpo = boost::program_options;
 
-static void finalizeIfNeeded(INvStorage &storage, const Uptane::Target &curTarget) {
+static void finalizeIfNeeded(INvStorage &storage, PackageConfig &config) {
   std::vector<Uptane::Target> installed_versions;
   size_t pending_index = SIZE_MAX;
   storage.loadInstalledVersions("", &installed_versions, nullptr, &pending_index);
 
   if (pending_index < installed_versions.size()) {
+    GObjectUniquePtr<OstreeSysroot> sysroot_smart = OstreeManager::LoadSysroot(config.sysroot);
+    OstreeDeployment *booted_deployment = ostree_sysroot_get_booted_deployment(sysroot_smart.get());
+    if (booted_deployment == nullptr) {
+      throw std::runtime_error("Could not get booted deployment in " + config.sysroot.string());
+    }
+    std::string current_hash = ostree_deployment_get_csum(booted_deployment);
+
     const Uptane::Target &target = installed_versions[pending_index];
-    if (curTarget == target) {
+    if (current_hash == target.sha256Hash()) {
       LOG_INFO << "Marking target install complete for: " << target;
       storage.saveInstalledVersion("", target, InstalledVersionUpdateMode::kCurrent);
     }
@@ -73,7 +80,7 @@ static std::shared_ptr<SotaUptaneClient> liteClient(Config &config, std::shared_
   keys.copyCertsToCurl(*http_client);
 
   auto client = std::make_shared<SotaUptaneClient>(config, storage, http_client, bootloader, report_queue);
-  finalizeIfNeeded(*storage, client->getCurrent());
+  finalizeIfNeeded(*storage, config.pacman);
   return client;
 }
 
@@ -279,6 +286,7 @@ static int daemon_main(Config &config, const bpo::variables_map &variables_map) 
     if (!targets_eq(*target, current, compareDockerApps)) {
       LOG_INFO << "Updating base image to: " << *target;
       if (do_update(*client, *storage, *target, lockfile) == 0) {
+        sync();
         if (std::system(rebootCmd.c_str()) != 0) {
           LOG_ERROR << "Unable to reboot system";
           return 1;
