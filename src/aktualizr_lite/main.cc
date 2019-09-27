@@ -285,6 +285,10 @@ static int update_main(Config &config, const bpo::variables_map &variables_map) 
 }
 
 static int daemon_main(Config &config, const bpo::variables_map &variables_map) {
+  if (config.uptane.repo_server.empty()) {
+    LOG_ERROR << "[uptane]/repo_server is not configured";
+    return 1;
+  }
   if (access(config.bootloader.reboot_command.c_str(), X_OK) != 0) {
     LOG_ERROR << "reboot command: " << config.bootloader.reboot_command << " is not executable";
     return 1;
