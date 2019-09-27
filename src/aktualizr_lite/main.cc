@@ -226,9 +226,9 @@ static int get_lock(const char *lockfile) {
     LOG_ERROR << "Unable to open lock file";
     return -1;
   }
-  LOG_INFO << "Aquiring lock";
+  LOG_INFO << "Acquiring lock";
   if (flock(fd, LOCK_EX) < 0) {
-    LOG_ERROR << "Unable to aquire lock";
+    LOG_ERROR << "Unable to acquire lock";
     close(fd);
     return -1;
   }
