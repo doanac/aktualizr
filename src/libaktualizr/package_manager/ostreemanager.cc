@@ -129,6 +129,12 @@ data::InstallationResult OstreeManager::install(const Uptane::Target &target) co
   GError *error = nullptr;
   g_autofree char *revision = nullptr;
 
+  // notify the bootloader before installation happens as it is not atomic
+  // and a false notification doesn't hurt with rollback support in place
+  if (bootloader_ != nullptr) {
+    bootloader_->updateNotify();
+  }
+
   if (config.os.size() != 0u) {
     opt_osname = config.os.c_str();
   }
