@@ -213,9 +213,18 @@ void DockerAppManager::handleRemovedApps(const Uptane::Target &target) const {
         DockerApp(name, config).remove();
       }
       if (std::find(target_apps.begin(), target_apps.end(), name) == target_apps.end()) {
-        LOG_WARNING << "Docker App(" << name
-                    << ") configured, but not defined in installation target. Removing from system";
-        DockerApp(name, config).remove();
+        if (target.custom_data().size() == 0) {
+          // The initial "target" a device has comes from a file created by
+          // the OE build that doesn't include custom data. We'll assume the
+          // user really wants these apps. This condition goes away after the
+          // device has an update applied
+          LOG_DEBUG << "No updates have been applied to device, assuming docker apps are correct";
+          LOG_ERROR << "No updates have been applied to device, assuming docker apps are correct";
+        } else {
+          LOG_WARNING << "Docker App(" << name
+                      << ") configured, but not defined in installation target. Removing from system";
+          DockerApp(name, config).remove();
+        }
       }
     }
   }
